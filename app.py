@@ -4,11 +4,11 @@ from streamlit_autorefresh import st_autorefresh
 from datetime import datetime
 import time as t
 
-# 1. Page Config & JavaScript for Notifications
+# 1. Page Config & JavaScript for Mobile/Chrome Notifications
 st.set_page_config(page_title="Official Friend Portal", layout="centered")
 
 def trigger_alert(sender, message):
-    js = f"""
+    js_code = f"""
     <script>
     if (Notification.permission === "granted") {{
         new Notification("New Intel: {sender}", {{
@@ -18,7 +18,7 @@ def trigger_alert(sender, message):
     }}
     </script>
     """
-    st.components.v1.html(js, height=0)
+    st.components.v1.html(js_code, height=0)
 
 st.markdown("""
     <style>
@@ -39,21 +39,6 @@ def save_message(user, content, msg_type="text"):
     with open(CHAT_FILE, "a") as f:
         f.write(f"{uid}|{ts}|{user}|{msg_type}|{content}\n")
 
-# 3. CRITICAL: Initialize session_state to prevent crashes
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-if "current_user" not in st.session_state:
-    st.session_state.current_user = "GUEST"
-if "last_notified_id" not in st.session_state:
-    st.session_state.last_notified_id = None
-
-# 4. Auth Logic
-if not st.session_state.authenticated:
-    st.title("🔐 Agent Login")
-    u_in = st.text_input("User").upper()
-    p_in = st.text_input("Key", type="password")
-    if st.button("Enter Portal"):
-        if u_in in users and users[u_in] == p_in:
-            st.session_state.current_user = u_in
-            st.session_state.authenticated = True
-            st.components.v1.html("
+# 3. CRITICAL: Initialize session_state to prevent AttributeErrors
+if "auth" not in st.session_state:
+    st.session_state
