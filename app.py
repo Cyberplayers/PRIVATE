@@ -4,10 +4,9 @@ from streamlit_autorefresh import st_autorefresh
 from datetime import datetime
 import time as t
 
-# 1. Page Config & CSS
+# 1. Page Config & JavaScript for Notifications
 st.set_page_config(page_title="Official Friend Portal", layout="centered")
 
-# JavaScript for Chrome/Android/Tablet Notifications
 def trigger_alert(sender, message):
     js = f"""
     <script>
@@ -29,7 +28,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Database & Folder Initialization
+# 2. Database Initialization
 users = {"PANTHER": "SOURCER", "SCORPION": "MASTERMIND", "PRIVATE": "HIDDEN"}
 if not os.path.exists("uploads"): os.makedirs("uploads")
 CHAT_FILE = "chat_log.txt"
@@ -40,7 +39,7 @@ def save_message(user, content, msg_type="text"):
     with open(CHAT_FILE, "a") as f:
         f.write(f"{uid}|{ts}|{user}|{msg_type}|{content}\n")
 
-# 3. CRITICAL: Initialize session_state to fix AttributeErrors
+# 3. CRITICAL: Initialize session_state to prevent crashes
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "current_user" not in st.session_state:
@@ -55,26 +54,6 @@ if not st.session_state.authenticated:
     p_in = st.text_input("Key", type="password")
     if st.button("Enter Portal"):
         if u_in in users and users[u_in] == p_in:
-            st.session_state.authenticated = True
             st.session_state.current_user = u_in
-            # This triggers the prompt on phone/PC to Allow Notifications
-            st.components.v1.html("<script>Notification.requestPermission();</script>", height=0)
-            st.rerun()
-        else:
-            st.error("Access Denied")
-else:
-    # 5. Multi-Device Notification Engine
-    st_autorefresh(interval=3000, key="portal_sync") 
-
-    if os.path.exists(CHAT_FILE):
-        with open(CHAT_FILE, "r") as f:
-            lines = f.readlines()
-            if lines:
-                last_line = lines[-1].strip().split("|")
-                last_id = last_line[0]
-                
-                if st.session_state.last_notified_id is None:
-                    st.session_state.last_notified_id = last_id
-                
-                if last_id != st.session_state.last_notified_id:
-                    sender, msg_txt = last_line[2], last_line
+            st.session_state.authenticated = True
+            st.components.v1.html("
