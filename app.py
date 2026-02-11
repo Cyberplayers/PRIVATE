@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 from streamlit_autorefresh import st_autorefresh
+from datetime import datetime
 
 st.set_page_config(page_title="Official Friend Portal", layout="centered")
 
@@ -21,8 +22,9 @@ if "current_user" not in st.session_state:
 CHAT_FILE = "chat_log.txt"
 
 def save_message(user, text):
+    timestamp = datetime.now().strftime("%H:%M")
     with open(CHAT_FILE, "a") as f:
-        f.write(f"{user}: {text}\n")
+        f.write(f"[{timestamp}] {user}: {text}\n")
 
 def get_messages():
     if os.path.exists(CHAT_FILE):
@@ -46,7 +48,7 @@ if not st.session_state.authenticated:
 
 # 5. The Main Portal (After Login)
 else:
-    # AUTO-REFRESH: This makes the app check for new messages every 5 seconds!
+    # AUTO-REFRESH: Keeps the chat live every 5 seconds
     st_autorefresh(interval=5000, key="chatupdate")
 
     st.title(f"Welcome, Agent {st.session_state.current_user}")
@@ -61,14 +63,26 @@ else:
     # GLOBAL CHAT SECTION
     st.subheader("💬 Global Mission Chat")
     
-    # Display messages
+    # NEW: Auto-Scrolling HTML Chat Box
     chat_data = get_messages()
-    # Create a scrolling-like view for the last 20 messages
-    chat_display = ""
-    for msg in chat_data[-20:]:
-        chat_display += msg + "\n"
-    
-    st.text_area("Live Feed", value=chat_display, height=300, disabled=True)
+    chat_html = ""
+    for msg in chat_data:
+        chat_html += f"<p style='margin:5px; font-family:monospace;'>{msg.strip()}</p>"
+
+    # This CSS creates the scrolling window and forces it to the bottom
+    st.markdown(
+        f"""
+        <div id="chat-container" style="height:300px; overflow-y:auto; border:1px solid #444; padding:10px; border-radius:5px; background-color:#111; color:#0f0;">
+            {chat_html}
+            <div id="end"></div>
+        </div>
+        <script>
+            var element = document.getElementById("chat-container");
+            element.scrollTop = element.scrollHeight;
+        </script>
+        """,
+        unsafe_allow_html=True
+    )
 
     # Message Input
     with st.form("chat_form", clear_on_submit=True):
