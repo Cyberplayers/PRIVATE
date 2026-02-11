@@ -7,7 +7,7 @@ import time as t
 # 1. Page Config & Security Shield
 st.set_page_config(page_title="Official Friend Portal", layout="centered")
 
-# CSS to block right-clicks and protect text selection
+# Block right-clicks and protect interface
 st.markdown("""
     <style>
     * { -webkit-user-select: none; user-select: none; }
@@ -42,68 +42,3 @@ def get_last_seen():
         with open(STATUS_FILE, "r") as f:
             for line in f.readlines():
                 try:
-                    p = line.strip().split("|")
-                    seen_dict[p[0]] = float(p[1])
-                except: continue
-    return seen_dict
-
-# 4. Screenshot Detection Logic
-st.components.v1.html(f"""
-    <script>
-    document.addEventListener("visibilitychange", function() {{
-        if (document.visibilityState === 'hidden') {{
-            fetch("/?ss_event=true&user={st.session_state.get('current_user', 'UNKNOWN')}");
-        }}
-    }});
-    </script>
-""", height=0)
-
-if st.query_params.get("ss_event") == "true":
-    violator = st.query_params.get("user", "UNKNOWN")
-    if violator != "PANTHER" and violator != "UNKNOWN":
-        save_message("SYSTEM", f"🚨 ALERT: {violator} took a screenshot or recorded the chat!", "security")
-    st.query_params.clear()
-
-# 5. Session & 90-Second Timeout Management
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-if st.session_state.authenticated:
-    current_time = t.time()
-    if "last_action_time" in st.session_state:
-        elapsed = current_time - st.session_state.last_action_time
-        if elapsed > 90:
-            st.session_state.authenticated = False
-            st.rerun()
-    st.session_state.last_action_time = current_time
-
-# 6. Auth Logic
-if not st.session_state.authenticated:
-    st.title("🔐 Official Login Portal")
-    name = st.text_input("Username").upper()
-    word = st.text_input("Password", type="password")
-    if st.button("Enter Portal"):
-        if name in users and users[name] == word:
-            st.session_state.authenticated, st.session_state.current_user = True, name
-            st.session_state.last_action_time = t.time()
-            st.rerun()
-        else:
-            st.error("Invalid Credentials")
-else:
-    # 7. Navigation Row: Status, Logout, and Meeting
-    st_autorefresh(interval=5000, key="chatupdate")
-    update_activity(st.session_state.current_user)
-    
-    col1, col2, col3 = st.columns([2,1,1])
-    with col1:
-        last_seen = get_last_seen()
-        online = [f"🟢 {u}" for u, ts in last_seen.items() if t.time() - ts < 60]
-        st.write(f"Active: {', '.join(online)}")
-    with col2:
-        if st.button("🚪 Logout"):
-            st.session_state.authenticated = False
-            st.rerun()
-    with col3:
-        if st.button("📢 MEETING"):
-            # Sends an urgent meeting notification to the chat
-            save
