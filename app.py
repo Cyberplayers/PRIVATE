@@ -50,11 +50,18 @@ if not st.session_state.authenticated:
             st.session_state.authenticated, st.session_state.current_user = True, name
             st.rerun()
 else:
-    # 5. AUTO-REFRESH (Every 5 seconds)
+    # 5. AUTO-REFRESH & ONLINE STATUS
     st_autorefresh(interval=5000, key="chatupdate")
     update_activity(st.session_state.current_user)
     last_seen = get_last_seen()
 
+    # Online Status Bar
+    online_agents = []
+    for agent, last_time in last_seen.items():
+        if t.time() - last_time < 60: # Active in last 60 seconds
+            online_agents.append(f"🟢 {agent}")
+    
+    st.markdown(f"**Agents Active:** {', '.join(online_agents)}")
     st.title(f"Welcome, Agent {st.session_state.current_user}")
     
     # 6. CHAT BOX
@@ -69,10 +76,12 @@ else:
                         for u, ts in last_seen.items():
                             if u != sender and ts > float(unix): status = "✓✓"
                         
-                        if mtype == "text": st.write(f"**[{clock}] {sender}:** {content} `{status}`")
+                        if mtype == "text": 
+                            st.write(f"**[{clock}] {sender}:** {content} `{status}`")
                         elif mtype == "image": 
                             st.write(f"**[{clock}] {sender} sent intel:**")
-                            st.image(content)
+                            # FIXED IMAGE SIZE HERE
+                            st.image(content, width=250) 
                         elif mtype == "audio":
                             st.write(f"**[{clock}] {sender} sent voice:**")
                             st.audio(content)
@@ -80,48 +89,8 @@ else:
 
     st.divider()
 
-    # 7. THE FOUR OPTIONS (FIXED FOR REPEATS)
+    # 7. THE FOUR OPTIONS
     t1, t2, t3, t4 = st.tabs(["💬 Text", "📸 Camera", "📁 Media", "🎤 Voice"])
     
     with t1:
-        with st.form("txt", clear_on_submit=True):
-            m = st.text_input("Message")
-            if st.form_submit_button("Send"):
-                save_message(st.session_state.current_user, m, "text")
-                st.rerun()
-    
-    with t2:
-        img_file = st.camera_input("Take Photo", key="cam_input")
-        if img_file:
-            # Check if this image was already processed
-            if "last_img" not in st.session_state or st.session_state.last_img != img_file.name:
-                p = os.path.join("uploads", img_file.name)
-                with open(p, "wb") as f: f.write(img_file.getbuffer())
-                save_message(st.session_state.current_user, p, "image")
-                st.session_state.last_img = img_file.name # Mark as sent
-                st.rerun()
-
-    with t3:
-        media_file = st.file_uploader("Select from Gallery", type=['png','jpg','jpeg'], key="media_input")
-        if media_file and st.button("Upload Selected"):
-            mp = os.path.join("uploads", media_file.name)
-            with open(mp, "wb") as f: f.write(media_file.getbuffer())
-            save_message(st.session_state.current_user, mp, "image")
-            st.rerun()
-
-    with t4:
-        # VOICE: Fixed repeat sending issue
-        audio_data = st.audio_input("Tap to record voice", key="voice_input")
-        if audio_data:
-            # Unique ID for the audio chunk to prevent re-sending on refresh
-            audio_id = hash(audio_data.getvalue())
-            if "last_voice_id" not in st.session_state or st.session_state.last_voice_id != audio_id:
-                ap = os.path.join("uploads", f"v_{int(t.time())}.wav")
-                with open(ap, "wb") as f: f.write(audio_data.getbuffer())
-                save_message(st.session_state.current_user, ap, "audio")
-                st.session_state.last_voice_id = audio_id # Mark this recording as sent
-                st.rerun()
-
-    if st.button("🧨 SELF-DESTRUCT"):
-        if os.path.exists(CHAT_FILE): os.remove(CHAT_FILE)
-        st.rerun()
+        with st.form("txt", clear_on_submit=True
