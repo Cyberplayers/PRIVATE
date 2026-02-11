@@ -4,24 +4,21 @@ from streamlit_autorefresh import st_autorefresh
 from datetime import datetime
 import time as t
 
-# 1. Page Config & CSS Styling
+# 1. Page Config & CSS
 st.set_page_config(page_title="Official Friend Portal", layout="centered")
 
 st.markdown("""
     <style>
     * { -webkit-user-select: none; user-select: none; }
-    img { pointer-events: none; }
     .stApp { background-color: #0e1117; color: #00ff41; }
     .security-msg { color: #ffffff; font-weight: bold; border: 2px solid #ff4b4b; padding: 10px; border-radius: 5px; background: #ff4b4b; text-align: center; margin-bottom: 10px; }
     .notif-msg { color: #000000; font-weight: bold; border: 1px solid #00ff41; padding: 8px; border-radius: 5px; background: #00ff41; text-align: center; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Database & Folder Initialization
+# 2. Setup
 users = {"PANTHER": "SOURCER", "SCORPION": "MASTERMIND", "PRIVATE": "HIDDEN"}
-if not os.path.exists("uploads"):
-    os.makedirs("uploads")
-
+if not os.path.exists("uploads"): os.makedirs("uploads")
 CHAT_FILE = "chat_log.txt"
 STATUS_FILE = "user_activity.txt"
 
@@ -32,10 +29,6 @@ def save_message(user, content, msg_type="text"):
     with open(CHAT_FILE, "a") as f:
         f.write(f"{unix_time}|{timestamp}|{user}|{msg_type}|{content}\n")
 
-def update_activity(user):
-    with open(STATUS_FILE, "a") as f:
-        f.write(f"{user}|{t.time()}\n")
-
 def get_last_seen():
     seen_dict = {}
     if os.path.exists(STATUS_FILE):
@@ -43,43 +36,13 @@ def get_last_seen():
             for line in f.readlines():
                 try:
                     p = line.strip().split("|")
-                    if len(p) == 2:
-                        seen_dict[p[0]] = float(p[1])
-                except:
-                    continue
+                    seen_dict[p[0]] = float(p[1])
+                except: continue
     return seen_dict
 
-# 4. Security: Screenshot & Tab-Switch Detection
-st.components.v1.html(f"""
-    <script>
-    document.addEventListener("visibilitychange", function() {{
-        if (document.visibilityState === 'hidden') {{
-            fetch("/?ss_event=true&user={st.session_state.get('current_user', 'UNKNOWN')}");
-        }}
-    }});
-    </script>
-""", height=0)
+# 4. Auth
+if "authenticated" not in st.session_state: st.session_state.authenticated = False
 
-if st.query_params.get("ss_event") == "true":
-    violator = st.query_params.get("user", "UNKNOWN")
-    if violator != "PANTHER" and violator != "UNKNOWN":
-        save_message("SYSTEM", f"🚨 ALERT: {violator} detected leaving or capturing screen!", "security")
-    st.query_params.clear()
-
-# 5. Session Management & 90-Second Timeout
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-if st.session_state.authenticated:
-    current_time = t.time()
-    if "last_action_time" in st.session_state:
-        elapsed = current_time - st.session_state.last_action_time
-        if elapsed > 90:
-            st.session_state.authenticated = False
-            st.rerun()
-    st.session_state.last_action_time = current_time
-
-# 6. Login Portal
 if not st.session_state.authenticated:
     st.title("🔐 Official Login Portal")
     name = st.text_input("Username").upper()
@@ -87,15 +50,30 @@ if not st.session_state.authenticated:
     if st.button("Enter Portal"):
         if name in users and users[name] == word:
             st.session_state.authenticated, st.session_state.current_user = True, name
-            st.session_state.last_action_time = t.time()
             st.rerun()
-        else:
-            st.error("Invalid Credentials")
 else:
-    # 7. Navigation & Status Row
-    st_autorefresh(interval=5000, key="chatupdate")
-    update_activity(st.session_state.current_user)
+    # 5. The Notification Engine
+    st_autorefresh(interval=3000, key="notif_check") # Check every 3 seconds
     
+    # Logic to detect NEW messages for the Pop-up
+    if os.path.exists(CHAT_FILE):
+        with open(CHAT_FILE, "r") as f:
+            lines = f.readlines()
+            if lines:
+                last_line = lines[-1].strip().split("|")
+                last_msg_id = last_line[0] # Use unix time as ID
+                
+                if "seen_msg_id" not in st.session_state:
+                    st.session_state.seen_msg_id = last_msg_id
+                
+                # If a new message appeared that isn't ours, POP UP!
+                if last_msg_id != st.session_state.seen_msg_id:
+                    sender = last_line[2]
+                    if sender != st.session_state.current_user:
+                        st.toast(f"💬 New message from {sender}!", icon="🔔")
+                    st.session_state.seen_msg_id = last_msg_id
+
+    # 6. Navigation Row
     col1, col2 = st.columns([3,1])
     with col1:
         last_seen = get_last_seen()
@@ -108,8 +86,8 @@ else:
 
     st.title(f"Welcome, Agent {st.session_state.current_user}")
     
-    # 8. Main Chat Interface
-    chat_box = st.container(height=450)
+    # 7. Chat Display
+    chat_box = st.container(height=400)
     with chat_box:
         if os.path.exists(CHAT_FILE):
             with open(CHAT_FILE, "r") as f:
@@ -117,79 +95,50 @@ else:
                     try:
                         p = line.strip().split("|")
                         unix, clock, sender, mtype, content = p[0], p[1], p[2], p[3], p[4]
-                        
-                        # Logic: ONLY PANTHER sees "security" alerts
                         if mtype == "security":
                             if st.session_state.current_user == "PANTHER":
                                 st.markdown(f"<div class='security-msg'>[{clock}] {content}</div>", unsafe_allow_html=True)
-                        
-                        # Logic: EVERYONE sees general notifications
                         elif mtype == "notif":
                             st.markdown(f"<div class='notif-msg'>[{clock}] {content}</div>", unsafe_allow_html=True)
-                        
-                        # Standard Messaging
                         else:
                             st.write(f"**[{clock}] {sender}:** {content}")
                             if mtype == "image": st.image(content, width=250)
                             if mtype == "audio": st.audio(content)
-                    except:
-                        continue
+                    except: continue
 
-    st.divider()
-
-    # 9. Restored Communication Tabs
+    # 8. Input Tabs
     t1, t2, t3, t4 = st.tabs(["💬 Text", "📸 Camera", "📁 Media", "🎤 Voice"])
-    
     with t1:
         with st.form("txt", clear_on_submit=True):
             m = st.text_input("Message")
             if st.form_submit_button("Send"):
                 save_message(st.session_state.current_user, m, "text")
-                st.session_state.last_action_time = t.time()
                 st.rerun()
-    
     with t2:
-        img_file = st.camera_input("Take Photo", key="cam_input")
-        if img_file:
-            if "last_img" not in st.session_state or st.session_state.last_img != img_file.name:
-                p = os.path.join("uploads", img_file.name)
-                with open(p, "wb") as f:
-                    f.write(img_file.getbuffer())
-                save_message(st.session_state.current_user, p, "image")
-                save_message("SYSTEM", f"📸 Camera capture by {st.session_state.current_user}", "notif")
-                st.session_state.last_img = img_file.name 
-                st.session_state.last_action_time = t.time()
-                st.rerun()
-
+        img = st.camera_input("Take Photo")
+        if img:
+            p = os.path.join("uploads", img.name)
+            with open(p, "wb") as f: f.write(img.getbuffer())
+            save_message(st.session_state.current_user, p, "image")
+            save_message("SYSTEM", f"📸 Camera capture by {st.session_state.current_user}", "notif")
+            st.rerun()
     with t3:
-        media_file = st.file_uploader("Upload Intel", type=['png','jpg','jpeg'], key="media_input")
-        if media_file and st.button("Submit Media"):
-            mp = os.path.join("uploads", media_file.name)
-            with open(mp, "wb") as f:
-                f.write(media_file.getbuffer())
+        media = st.file_uploader("Upload", type=['png','jpg','jpeg'])
+        if media and st.button("Submit"):
+            mp = os.path.join("uploads", media.name)
+            with open(mp, "wb") as f: f.write(media.getbuffer())
             save_message(st.session_state.current_user, mp, "image")
             save_message("SYSTEM", f"📁 Intel uploaded by {st.session_state.current_user}", "notif")
-            st.session_state.last_action_time = t.time()
+            st.rerun()
+    with t4:
+        v = st.audio_input("Record")
+        if v:
+            ap = os.path.join("uploads", f"v_{int(t.time())}.wav")
+            with open(ap, "wb") as f: f.write(v.getbuffer())
+            save_message(st.session_state.current_user, ap, "audio")
+            save_message("SYSTEM", f"🎤 Audio recorded by {st.session_state.current_user}", "notif")
             st.rerun()
 
-    with t4:
-        voice = st.audio_input("Record", key="voice_input")
-        if voice:
-            v_id = hash(voice.getvalue())
-            if "last_v" not in st.session_state or st.session_state.last_v != v_id:
-                ap = os.path.join("uploads", f"v_{int(t.time())}.wav")
-                with open(ap, "wb") as f:
-                    f.write(voice.getbuffer())
-                save_message(st.session_state.current_user, ap, "audio")
-                save_message("SYSTEM", f"🎤 Audio recorded by {st.session_state.current_user}", "notif")
-                st.session_state.last_v = v_id 
-                st.session_state.last_action_time = t.time()
-                st.rerun()
-
-    # 10. Manual Self-Destruct
     if st.button("🧨 SELF-DESTRUCT"):
-        if os.path.exists(CHAT_FILE):
-            os.remove(CHAT_FILE)
-        for fn in os.listdir("uploads"):
-            os.remove(os.path.join("uploads", fn))
+        if os.path.exists(CHAT_FILE): os.remove(CHAT_FILE)
         st.rerun()
