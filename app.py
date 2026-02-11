@@ -49,16 +49,17 @@ if not st.session_state.authenticated:
         if name in users and users[name] == word:
             st.session_state.authenticated, st.session_state.current_user = True, name
             st.rerun()
+        else:
+            st.error("Invalid Credentials")
 else:
     # 5. AUTO-REFRESH & ONLINE STATUS
     st_autorefresh(interval=5000, key="chatupdate")
     update_activity(st.session_state.current_user)
     last_seen = get_last_seen()
 
-    # Online Status Bar
     online_agents = []
     for agent, last_time in last_seen.items():
-        if t.time() - last_time < 60: # Active in last 60 seconds
+        if t.time() - last_time < 60:
             online_agents.append(f"🟢 {agent}")
     
     st.markdown(f"**Agents Active:** {', '.join(online_agents)}")
@@ -80,7 +81,6 @@ else:
                             st.write(f"**[{clock}] {sender}:** {content} `{status}`")
                         elif mtype == "image": 
                             st.write(f"**[{clock}] {sender} sent intel:**")
-                            # FIXED IMAGE SIZE HERE
                             st.image(content, width=250) 
                         elif mtype == "audio":
                             st.write(f"**[{clock}] {sender} sent voice:**")
@@ -93,4 +93,41 @@ else:
     t1, t2, t3, t4 = st.tabs(["💬 Text", "📸 Camera", "📁 Media", "🎤 Voice"])
     
     with t1:
-        with st.form("txt", clear_on_submit=True
+        with st.form("txt", clear_on_submit=True):
+            m = st.text_input("Message")
+            if st.form_submit_button("Send"):
+                save_message(st.session_state.current_user, m, "text")
+                st.rerun()
+    
+    with t2:
+        img_file = st.camera_input("Take Photo", key="cam_input")
+        if img_file:
+            if "last_img" not in st.session_state or st.session_state.last_img != img_file.name:
+                p = os.path.join("uploads", img_file.name)
+                with open(p, "wb") as f: f.write(img_file.getbuffer())
+                save_message(st.session_state.current_user, p, "image")
+                st.session_state.last_img = img_file.name 
+                st.rerun()
+
+    with t3:
+        media_file = st.file_uploader("Select from Gallery", type=['png','jpg','jpeg'], key="media_input")
+        if media_file and st.button("Upload Selected"):
+            mp = os.path.join("uploads", media_file.name)
+            with open(mp, "wb") as f: f.write(media_file.getbuffer())
+            save_message(st.session_state.current_user, mp, "image")
+            st.rerun()
+
+    with t4:
+        audio_data = st.audio_input("Tap to record voice", key="voice_input")
+        if audio_data:
+            audio_id = hash(audio_data.getvalue())
+            if "last_voice_id" not in st.session_state or st.session_state.last_voice_id != audio_id:
+                ap = os.path.join("uploads", f"v_{int(t.time())}.wav")
+                with open(ap, "wb") as f: f.write(audio_data.getbuffer())
+                save_message(st.session_state.current_user, ap, "audio")
+                st.session_state.last_voice_id = audio_id 
+                st.rerun()
+
+    if st.button("🧨 SELF-DESTRUCT"):
+        if os.path.exists(CHAT_FILE): os.remove(CHAT_FILE)
+        st.rerun()
