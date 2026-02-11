@@ -7,7 +7,6 @@ import time as t
 # 1. Page Config & Security Shield
 st.set_page_config(page_title="Official Friend Portal", layout="centered")
 
-# CSS to block right-clicks and text selection
 st.markdown("""
     <style>
     * { -webkit-user-select: none; user-select: none; }
@@ -42,8 +41,8 @@ def get_last_seen():
         with open(STATUS_FILE, "r") as f:
             for line in f.readlines():
                 try:
-                    parts = line.strip().split("|")
-                    seen_dict[parts[0]] = float(parts[1])
+                    p = line.strip().split("|")
+                    seen_dict[p[0]] = float(p[1])
                 except: continue
     return seen_dict
 
@@ -58,7 +57,6 @@ st.components.v1.html(f"""
     </script>
 """, height=0)
 
-# Process Screenshot Alerts
 if st.query_params.get("ss_event") == "true":
     violator = st.query_params.get("user", "UNKNOWN")
     if violator != "PANTHER" and violator != "UNKNOWN":
@@ -78,7 +76,7 @@ if st.session_state.authenticated:
             st.rerun()
     st.session_state.last_action_time = current_time
 
-# 6. Login Portal
+# 6. Auth Logic
 if not st.session_state.authenticated:
     st.title("🔐 Official Login Portal")
     name = st.text_input("Username").upper()
@@ -91,23 +89,24 @@ if not st.session_state.authenticated:
         else:
             st.error("Invalid Credentials")
 else:
-    # 7. TOP ROW: ONLINE STATUS, LOGOUT, EMERGENCY
+    # 7. TOP ROW: STATUS, LOGOUT, MEETING REQUEST
     st_autorefresh(interval=5000, key="chatupdate")
     update_activity(st.session_state.current_user)
     
-    c1, c2, c3 = st.columns([2,1,1])
-    with c1:
+    col1, col2, col3 = st.columns([2,1,1])
+    with col1:
         last_seen = get_last_seen()
         online = [f"🟢 {u}" for u, ts in last_seen.items() if t.time() - ts < 60]
-        st.write(f"Agents Active: {', '.join(online)}")
-    with c2:
-        if st.button("🚪 LOGOUT"):
+        st.write(f"Active: {', '.join(online)}")
+    with col2:
+        if st.button("🚪 Logout"):
             st.session_state.authenticated = False
             st.rerun()
-    with c3:
-        if st.button("🚨 PANIC"):
-            st.session_state.authenticated = False
-            st.rerun()
+    with col3:
+        if st.button("🚨 URGENT MEETING"):
+            # Sends a meeting notification without logging out
+            save_message("SYSTEM", f"📢 URGENT MEETING REQUEST from {st.session_state.current_user}!", "security")
+            st.toast("Meeting Request Sent!")
 
     st.title(f"Welcome, Agent {st.session_state.current_user}")
     
@@ -122,6 +121,7 @@ else:
                         unix, clock, sender, mtype, content = p[0], p[1], p[2], p[3], p[4]
                         
                         if mtype == "security":
+                            # Only Panther sees security and meeting alerts
                             if st.session_state.current_user == "PANTHER":
                                 st.markdown(f"<div class='security-msg'>[{clock}] {content}</div>", unsafe_allow_html=True)
                         elif mtype == "text": 
@@ -136,50 +136,5 @@ else:
 
     st.divider()
 
-    # 9. FOUR INPUT TABS
-    t1, t2, t3, t4 = st.tabs(["💬 Text", "📸 Camera", "📁 Media", "🎤 Voice"])
-    
-    with t1:
-        with st.form("txt", clear_on_submit=True):
-            m = st.text_input("Message")
-            if st.form_submit_button("Send"):
-                save_message(st.session_state.current_user, m, "text")
-                st.session_state.last_action_time = t.time()
-                st.rerun()
-    
-    with t2:
-        img_file = st.camera_input("Take Photo", key="cam_input")
-        if img_file:
-            if "last_img" not in st.session_state or st.session_state.last_img != img_file.name:
-                p = os.path.join("uploads", img_file.name)
-                with open(p, "wb") as f: f.write(img_file.getbuffer())
-                save_message(st.session_state.current_user, p, "image")
-                st.session_state.last_img = img_file.name 
-                st.session_state.last_action_time = t.time()
-                st.rerun()
-
-    with t3:
-        media_file = st.file_uploader("Select Media", type=['png','jpg','jpeg'], key="media_input")
-        if media_file and st.button("Upload"):
-            mp = os.path.join("uploads", media_file.name)
-            with open(mp, "wb") as f: f.write(media_file.getbuffer())
-            save_message(st.session_state.current_user, mp, "image")
-            st.session_state.last_action_time = t.time()
-            st.rerun()
-
-    with t4:
-        voice = st.audio_input("Record Voice", key="voice_input")
-        if voice:
-            vid = hash(voice.getvalue())
-            if "last_v" not in st.session_state or st.session_state.last_v != vid:
-                ap = os.path.join("uploads", f"v_{int(t.time())}.wav")
-                with open(ap, "wb") as f: f.write(voice.getbuffer())
-                save_message(st.session_state.current_user, ap, "audio")
-                st.session_state.last_v = vid 
-                st.session_state.last_action_time = t.time()
-                st.rerun()
-
-    if st.button("🧨 SELF-DESTRUCT"):
-        if os.path.exists(CHAT_FILE): os.remove(CHAT_FILE)
-        for fn in os.listdir("uploads"): os.remove(os.path.join("uploads", fn))
-        st.rerun()
+    # 9. INPUT TABS
+    t1, t2, t3, t4 = st
