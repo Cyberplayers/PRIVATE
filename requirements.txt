@@ -1,2 +1,4 @@
 streamlit-autorefresh
-st-audio-recorder
+streamlit-audio-recorder
+Pillow
+pydub
