@@ -49,17 +49,15 @@ if not st.session_state.authenticated:
         if name in users and users[name] == word:
             st.session_state.authenticated, st.session_state.current_user = True, name
             st.rerun()
-        else:
-            st.error("Invalid Credentials")
 else:
-    # AUTO-REFRESH (Every 5 seconds)
+    # 5. AUTO-REFRESH (Every 5 seconds)
     st_autorefresh(interval=5000, key="chatupdate")
     update_activity(st.session_state.current_user)
     last_seen = get_last_seen()
 
     st.title(f"Welcome, Agent {st.session_state.current_user}")
     
-    # CHAT BOX WITH AUTO-SCROLL
+    # 6. CHAT BOX
     chat_box = st.container(height=450)
     with chat_box:
         if os.path.exists(CHAT_FILE):
@@ -67,7 +65,6 @@ else:
                 for line in f.readlines():
                     try:
                         unix, clock, sender, mtype, content = line.strip().split("|")
-                        # SEEN LOGIC (✓✓)
                         status = "✓"
                         for u, ts in last_seen.items():
                             if u != sender and ts > float(unix): status = "✓✓"
@@ -83,7 +80,7 @@ else:
 
     st.divider()
 
-    # THE FOUR OPTIONS TABS
+    # 7. THE FOUR OPTIONS (FIXED FOR REPEATS)
     t1, t2, t3, t4 = st.tabs(["💬 Text", "📸 Camera", "📁 Media", "🎤 Voice"])
     
     with t1:
@@ -94,18 +91,18 @@ else:
                 st.rerun()
     
     with t2:
-        # CAMERA: Opens phone camera immediately
-        img_file = st.camera_input("Take Photo")
+        img_file = st.camera_input("Take Photo", key="cam_input")
         if img_file:
-            p = os.path.join("uploads", img_file.name)
-            with open(p, "wb") as f: f.write(img_file.getbuffer())
-            save_message(st.session_state.current_user, p, "image")
-            st.success("Photo Dispatched!")
-            st.rerun()
+            # Check if this image was already processed
+            if "last_img" not in st.session_state or st.session_state.last_img != img_file.name:
+                p = os.path.join("uploads", img_file.name)
+                with open(p, "wb") as f: f.write(img_file.getbuffer())
+                save_message(st.session_state.current_user, p, "image")
+                st.session_state.last_img = img_file.name # Mark as sent
+                st.rerun()
 
     with t3:
-        # MEDIA: Choose existing files from phone gallery
-        media_file = st.file_uploader("Select from Gallery", type=['png','jpg','jpeg','mp4','mov'])
+        media_file = st.file_uploader("Select from Gallery", type=['png','jpg','jpeg'], key="media_input")
         if media_file and st.button("Upload Selected"):
             mp = os.path.join("uploads", media_file.name)
             with open(mp, "wb") as f: f.write(media_file.getbuffer())
@@ -113,15 +110,17 @@ else:
             st.rerun()
 
     with t4:
-        # VOICE: Record directly from browser microphone
-        st.write("Record Voice Note")
-        audio_file = st.audio_input("Tap to record voice")
-        if audio_file:
-            ap = os.path.join("uploads", f"v_{int(t.time())}.wav")
-            with open(ap, "wb") as f: f.write(audio_file.getbuffer())
-            save_message(st.session_state.current_user, ap, "audio")
-            st.success("Voice Sent!")
-            st.rerun()
+        # VOICE: Fixed repeat sending issue
+        audio_data = st.audio_input("Tap to record voice", key="voice_input")
+        if audio_data:
+            # Unique ID for the audio chunk to prevent re-sending on refresh
+            audio_id = hash(audio_data.getvalue())
+            if "last_voice_id" not in st.session_state or st.session_state.last_voice_id != audio_id:
+                ap = os.path.join("uploads", f"v_{int(t.time())}.wav")
+                with open(ap, "wb") as f: f.write(audio_data.getbuffer())
+                save_message(st.session_state.current_user, ap, "audio")
+                st.session_state.last_voice_id = audio_id # Mark this recording as sent
+                st.rerun()
 
     if st.button("🧨 SELF-DESTRUCT"):
         if os.path.exists(CHAT_FILE): os.remove(CHAT_FILE)
