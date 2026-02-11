@@ -12,11 +12,9 @@ def trigger_mobile_notif(sender, message):
     js = f"""
     <script>
     if (Notification.permission === "granted") {{
-        const notif = new Notification("New Intel: {sender}", {{
+        new Notification("New Intel: {sender}", {{
             body: "{message}",
-            vibrate: [200, 100, 200],
-            tag: 'chat-alert',
-            renotify: true
+            vibrate: [200, 100, 200]
         }});
     }}
     </script>
@@ -32,3 +30,23 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # 2. Database Setup
+users = {"PANTHER": "SOURCER", "SCORPION": "MASTERMIND", "PRIVATE": "HIDDEN"}
+if not os.path.exists("uploads"): os.makedirs("uploads")
+CHAT_FILE = "chat_log.txt"
+
+def save_message(user, content, msg_type="text"):
+    ts = datetime.now().strftime("%H:%M")
+    uid = str(t.time())
+    with open(CHAT_FILE, "a") as f:
+        f.write(f"{uid}|{ts}|{user}|{msg_type}|{content}\n")
+
+# 3. Auth Logic - Corrected initialization
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+if "current_user" not in st.session_state:
+    st.session_state.current_user = "UNKNOWN"
+
+if not st.session_state.authenticated:
+    st.title("🔐 Login")
+    u_in = st.text_input("User").upper()
+    p_in = st
