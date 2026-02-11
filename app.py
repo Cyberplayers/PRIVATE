@@ -4,11 +4,11 @@ from streamlit_autorefresh import st_autorefresh
 from datetime import datetime
 import time as t
 
-# 1. Page Config
+# 1. Page Config & CSS
 st.set_page_config(page_title="Official Friend Portal", layout="centered")
 
-# JavaScript for System Notifications (Chrome, Android, Tablets)
-def trigger_mobile_notif(sender, message):
+# JavaScript for Chrome/Android/Tablet Notifications
+def trigger_system_alert(sender, message):
     js = f"""
     <script>
     if (Notification.permission === "granted") {{
@@ -29,24 +29,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Database Setup
+# 2. Database & Folder Setup
 users = {"PANTHER": "SOURCER", "SCORPION": "MASTERMIND", "PRIVATE": "HIDDEN"}
 if not os.path.exists("uploads"): os.makedirs("uploads")
 CHAT_FILE = "chat_log.txt"
 
 def save_message(user, content, msg_type="text"):
     ts = datetime.now().strftime("%H:%M")
-    uid = str(t.time())
-    with open(CHAT_FILE, "a") as f:
-        f.write(f"{uid}|{ts}|{user}|{msg_type}|{content}\n")
-
-# 3. Auth Logic - Corrected initialization
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-if "current_user" not in st.session_state:
-    st.session_state.current_user = "UNKNOWN"
-
-if not st.session_state.authenticated:
-    st.title("🔐 Login")
-    u_in = st.text_input("User").upper()
-    p_in = st
+    uid =
