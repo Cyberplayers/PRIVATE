@@ -4,20 +4,20 @@ from streamlit_autorefresh import st_autorefresh
 from datetime import datetime
 import time as t
 
-# 1. Page Config & JavaScript for Chrome Notifications
+# 1. Page Config & Updated JavaScript for Vibrate + Notifications
 st.set_page_config(page_title="Official Friend Portal", layout="centered")
 
-# This script asks for Chrome permission and triggers the System Pop-up
-def trigger_chrome_notification(sender, message):
+def trigger_vibrating_notification(sender, message):
+    # This script adds 'vibrate' which works on most Android phones/Tablets
     js_code = f"""
     <script>
     if (Notification.permission === "granted") {{
-        new Notification("New Message from {sender}", {{
+        const notif = new Notification("New Intel: {sender}", {{
             body: "{message}",
-            icon: "https://streamlit.io/images/brand/streamlit-mark-color.png"
+            vibrate: [200, 100, 200],
+            tag: "portal-msg",
+            renotify: true
         }});
-    }} else if (Notification.permission !== "denied") {{
-        Notification.requestPermission();
     }}
     </script>
     """
@@ -31,7 +31,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Setup
+# 2. Database Setup
 users = {"PANTHER": "SOURCER", "SCORPION": "MASTERMIND", "PRIVATE": "HIDDEN"}
 if not os.path.exists("uploads"): os.makedirs("uploads")
 CHAT_FILE = "chat_log.txt"
@@ -42,7 +42,7 @@ def save_message(user, content, msg_type="text"):
     with open(CHAT_FILE, "a") as f:
         f.write(f"{uid}|{ts}|{user}|{msg_type}|{content}\n")
 
-# 3. Auth Logic
+# 3. Auth Logic (Initialized to prevent Blackouts)
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
@@ -54,12 +54,12 @@ if not st.session_state.authenticated:
         if u_in in users and users[u_in] == p_in:
             st.session_state.authenticated = True
             st.session_state.current_user = u_in
-            # Ask for Chrome Permission on first login
+            # Request Chrome Permission immediately
             st.components.v1.html("<script>Notification.requestPermission();</script>", height=0)
             st.rerun()
 else:
-    # 4. Refresh & Chrome Notification Logic
-    st_autorefresh(interval=3000, key="refresh") #
+    # 4. Refresh & Smart Notification Engine
+    st_autorefresh(interval=3000, key="refresh") 
 
     if os.path.exists(CHAT_FILE):
         with open(CHAT_FILE, "r") as f:
@@ -71,15 +71,15 @@ else:
                 if "last_seen_id" not in st.session_state:
                     st.session_state.last_seen_id = last_id
                 
-                # TRIGGER CHROME SYSTEM NOTIFICATION
+                # If a new message appears that isn't yours, vibrate and notify
                 if last_id != st.session_state.last_seen_id:
                     sender = last_data[2]
                     msg_content = last_data[4]
                     if sender != st.session_state.current_user:
-                        trigger_chrome_notification(sender, msg_content)
+                        trigger_vibrating_notification(sender, msg_content)
                     st.session_state.last_seen_id = last_id
 
-    # 5. UI Layout
+    # 5. Dashboard Header
     col1, col2 = st.columns([3, 1])
     with col2:
         if st.button("Logout"):
