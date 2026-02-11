@@ -84,27 +84,34 @@ else:
     st.divider()
 
     # INPUT TABS
-    t1, t2, t3 = st.tabs(["💬 Text", "🖼️ Image", "🎤 Voice"])
+    t1, t2, t3 = st.tabs(["💬 Text", "📸 Camera", "🎤 Record"])
+    
     with t1:
         with st.form("txt", clear_on_submit=True):
             m = st.text_input("Message")
             if st.form_submit_button("Send"):
                 save_message(st.session_state.current_user, m, "text")
                 st.rerun()
+    
     with t2:
-        img = st.file_uploader("Upload", type=['png','jpg','jpeg'])
-        if img and st.button("Upload Intel"):
-            p = os.path.join("uploads", img.name)
-            with open(p, "wb") as f: f.write(img.getbuffer())
+        # Camera Input: Opens camera on phone
+        img_file = st.camera_input("Take a Photo")
+        if img_file:
+            p = os.path.join("uploads", img_file.name)
+            with open(p, "wb") as f: f.write(img_file.getbuffer())
             save_message(st.session_state.current_user, p, "image")
+            st.success("Intel Dispatched!")
             st.rerun()
+
     with t3:
-        # Simplified Audio Upload (Stable)
-        aud = st.file_uploader("Record on phone & upload voice", type=['mp3','wav','m4a'])
-        if aud and st.button("Send Voice"):
-            ap = os.path.join("uploads", aud.name)
-            with open(ap, "wb") as f: f.write(aud.getbuffer())
+        # Direct Audio Recorder for Mobile
+        st.write("Record Voice Note")
+        audio_file = st.audio_input("Tap to record")
+        if audio_file:
+            ap = os.path.join("uploads", f"v_{int(t.time())}.wav")
+            with open(ap, "wb") as f: f.write(audio_file.getbuffer())
             save_message(st.session_state.current_user, ap, "audio")
+            st.success("Voice Note Sent!")
             st.rerun()
 
     if st.button("🧨 SELF-DESTRUCT"):
