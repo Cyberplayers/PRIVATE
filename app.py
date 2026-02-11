@@ -6,7 +6,6 @@ import time as t
 
 # 1. Page Config
 st.set_page_config(page_title="Official Friend Portal", layout="centered")
-from st_audiorecorder import audiorecorder # Stable audio import
 
 # 2. Setup Database & Users
 users = {"PANTHER": "SOURCER", "SCORPION": "MASTERMIND", "PRIVATE": "HIDDEN"}
@@ -53,7 +52,7 @@ if not st.session_state.authenticated:
         else:
             st.error("Invalid Credentials")
 else:
-    # AUTO-REFRESH & SEEN LOGIC
+    # AUTO-REFRESH (Updates every 5 seconds)
     st_autorefresh(interval=5000, key="chatupdate")
     update_activity(st.session_state.current_user)
     last_seen = get_last_seen()
@@ -68,6 +67,7 @@ else:
                 for line in f.readlines():
                     try:
                         unix, clock, sender, mtype, content = line.strip().split("|")
+                        # SEEN LOGIC (✓✓)
                         status = "✓"
                         for u, ts in last_seen.items():
                             if u != sender and ts > float(unix): status = "✓✓"
@@ -99,11 +99,11 @@ else:
             save_message(st.session_state.current_user, p, "image")
             st.rerun()
     with t3:
-        st.write("Record Voice Note")
-        audio = audiorecorder("Click to Record", "Click to Stop")
-        if len(audio) > 0 and st.button("Send Voice"):
-            ap = os.path.join("uploads", f"v_{int(t.time())}.mp3")
-            audio.export(ap, format="mp3")
+        # Simplified Audio Upload (Stable)
+        aud = st.file_uploader("Record on phone & upload voice", type=['mp3','wav','m4a'])
+        if aud and st.button("Send Voice"):
+            ap = os.path.join("uploads", aud.name)
+            with open(ap, "wb") as f: f.write(aud.getbuffer())
             save_message(st.session_state.current_user, ap, "audio")
             st.rerun()
 
