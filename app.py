@@ -112,4 +112,3 @@ else:
         if os.path.exists(CHAT_FILE): os.remove(CHAT_FILE)
         for f in os.listdir("uploads"): os.remove(os.path.join("uploads", f))
         st.rerun()
-        
