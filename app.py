@@ -7,14 +7,16 @@ import time as t
 # 1. Page Config
 st.set_page_config(page_title="Official Friend Portal", layout="centered")
 
-# JavaScript for System-Level Chrome Notifications
-def send_chrome_notif(title, message):
+# JavaScript for System Notifications (Chrome, Android, Tablets)
+def trigger_mobile_notif(sender, message):
     js = f"""
     <script>
     if (Notification.permission === "granted") {{
-        new Notification("{title}", {{
+        const notif = new Notification("New Intel: {sender}", {{
             body: "{message}",
-            icon: "https://cdn-icons-png.flaticon.com/512/561/561127.png"
+            vibrate: [200, 100, 200],
+            tag: 'chat-alert',
+            renotify: true
         }});
     }}
     </script>
@@ -29,106 +31,4 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Setup
-users = {"PANTHER": "SOURCER", "SCORPION": "MASTERMIND", "PRIVATE": "HIDDEN"}
-if not os.path.exists("uploads"): os.makedirs("uploads")
-CHAT_FILE = "chat_log.txt"
-
-def save_message(user, content, msg_type="text"):
-    ts = datetime.now().strftime("%H:%M")
-    uid = str(t.time())
-    with open(CHAT_FILE, "a") as f:
-        f.write(f"{uid}|{ts}|{user}|{msg_type}|{content}\n")
-
-# 3. Auth
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-if not st.session_state.authenticated:
-    st.title("🔐 Login")
-    u_in = st.text_input("User").upper()
-    p_in = st.text_input("Pass", type="password")
-    if st.button("Enter"):
-        if u_in in users and users[u_in] == p_in:
-            st.session_state.authenticated = True
-            st.session_state.current_user = u_in
-            # Request Chrome Permission immediately
-            st.components.v1.html("<script>Notification.requestPermission();</script>", height=0)
-            st.rerun()
-else:
-    # 4. Refresh & Chrome System Notification Engine
-    st_autorefresh(interval=3000, key="refresh") #
-
-    if os.path.exists(CHAT_FILE):
-        with open(CHAT_FILE, "r") as f:
-            lines = f.readlines()
-            if lines:
-                last_line = lines[-1].strip().split("|")
-                last_id = last_line[0]
-                
-                if "last_notified_id" not in st.session_state:
-                    st.session_state.last_notified_id = last_id
-                
-                # TRIGGER CHROME NOTIFICATION
-                if last_id != st.session_state.last_notified_id:
-                    sender = last_line[2]
-                    msg_txt = last_line[4]
-                    if sender != st.session_state.current_user:
-                        send_chrome_notif(f"Message from {sender}", msg_txt)
-                    st.session_state.last_notified_id = last_id
-
-    # 5. Dashboard
-    col1, col2 = st.columns([3, 1])
-    with col2:
-        if st.button("Logout"):
-            st.session_state.authenticated = False
-            st.rerun()
-
-    st.title(f"Portal: {st.session_state.current_user}")
-    
-    chat_box = st.container(height=400)
-    with chat_box:
-        if os.path.exists(CHAT_FILE):
-            with open(CHAT_FILE, "r") as f:
-                for line in f.readlines():
-                    try:
-                        uid, ts, user, mtype, msg = line.strip().split("|")
-                        if mtype == "security":
-                            if st.session_state.current_user == "PANTHER":
-                                st.markdown(f"<div class='security-msg'>[{ts}] {msg}</div>", unsafe_allow_html=True)
-                        elif mtype == "notif":
-                            st.markdown(f"<div class='notif-msg'>[{ts}] {msg}</div>", unsafe_allow_html=True)
-                        else:
-                            st.write(f"**[{ts}] {user}:** {msg}")
-                            if mtype == "image": st.image(msg, width=250)
-                            if mtype == "audio": st.audio(msg)
-                    except: continue
-
-    # 6. Messaging Tools
-    t1, t2, t3 = st.tabs(["💬 Chat", "📸 Media", "🎤 Voice"])
-    with t1:
-        with st.form("msg", clear_on_submit=True):
-            txt = st.text_input("Message")
-            if st.form_submit_button("Send"):
-                save_message(st.session_state.current_user, txt, "text")
-                st.rerun()
-    with t2:
-        cam = st.camera_input("Camera")
-        if cam:
-            path = os.path.join("uploads", cam.name)
-            with open(path, "wb") as f: f.write(cam.getbuffer())
-            save_message(st.session_state.current_user, path, "image")
-            save_message("SYSTEM", f"{st.session_state.current_user} shared media", "notif")
-            st.rerun()
-    with t3:
-        aud = st.audio_input("Record")
-        if aud:
-            path = os.path.join("uploads", f"v_{int(t.time())}.wav")
-            with open(path, "wb") as f: f.write(aud.getbuffer())
-            save_message(st.session_state.current_user, path, "audio")
-            save_message("SYSTEM", f"{st.session_state.current_user} sent a voice note", "notif")
-            st.rerun()
-
-    if st.button("🧨 SELF-DESTRUCT"):
-        if os.path.exists(CHAT_FILE): os.remove(CHAT_FILE)
-        st.rerun()
+# 2. Database Setup
