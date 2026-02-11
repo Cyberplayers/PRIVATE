@@ -6,9 +6,9 @@ import time as t
 
 # 1. Page Config
 st.set_page_config(page_title="Official Friend Portal", layout="centered")
-from st_custom_components import st_audiorecorder # Updated for stability
+from st_audiorecorder import audiorecorder # Stable audio import
 
-# 2. Database & Setup
+# 2. Setup Database & Users
 users = {"PANTHER": "SOURCER", "SCORPION": "MASTERMIND", "PRIVATE": "HIDDEN"}
 if not os.path.exists("uploads"):
     os.makedirs("uploads")
@@ -16,6 +16,7 @@ if not os.path.exists("uploads"):
 CHAT_FILE = "chat_log.txt"
 STATUS_FILE = "user_activity.txt"
 
+# 3. Helper Functions
 def save_message(user, content, msg_type="text"):
     timestamp = datetime.now().strftime("%H:%M")
     unix_time = t.time()
@@ -37,7 +38,7 @@ def get_last_seen():
                 except: continue
     return seen_dict
 
-# 3. Auth Logic
+# 4. Auth Logic
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
@@ -52,14 +53,14 @@ if not st.session_state.authenticated:
         else:
             st.error("Invalid Credentials")
 else:
-    # AUTO-SYNC
+    # AUTO-REFRESH & SEEN LOGIC
     st_autorefresh(interval=5000, key="chatupdate")
     update_activity(st.session_state.current_user)
     last_seen = get_last_seen()
 
     st.title(f"Welcome, Agent {st.session_state.current_user}")
     
-    # CHAT FEED
+    # CHAT BOX WITH AUTO-SCROLL
     chat_box = st.container(height=450)
     with chat_box:
         if os.path.exists(CHAT_FILE):
@@ -75,11 +76,9 @@ else:
                         elif mtype == "image": 
                             st.write(f"**[{clock}] {sender} sent intel:**")
                             st.image(content)
-                            st.caption(f"Status: {status}")
                         elif mtype == "audio":
                             st.write(f"**[{clock}] {sender} sent voice:**")
                             st.audio(content)
-                            st.caption(f"Status: {status}")
                     except: continue
 
     st.divider()
@@ -101,14 +100,13 @@ else:
             st.rerun()
     with t3:
         st.write("Record Voice Note")
-        audio = st_audiorecorder()
-        if audio and st.button("Send Voice"):
-            ap = os.path.join("uploads", f"v_{int(t.time())}.wav")
-            with open(ap, "wb") as f: f.write(audio)
+        audio = audiorecorder("Click to Record", "Click to Stop")
+        if len(audio) > 0 and st.button("Send Voice"):
+            ap = os.path.join("uploads", f"v_{int(t.time())}.mp3")
+            audio.export(ap, format="mp3")
             save_message(st.session_state.current_user, ap, "audio")
             st.rerun()
 
     if st.button("🧨 SELF-DESTRUCT"):
         if os.path.exists(CHAT_FILE): os.remove(CHAT_FILE)
-        for f in os.listdir("uploads"): os.remove(os.path.join("uploads", f))
         st.rerun()
