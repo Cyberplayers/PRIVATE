@@ -2,6 +2,7 @@ import streamlit as st
 import os
 from streamlit_autorefresh import st_autorefresh
 from datetime import datetime
+from PIL import Image
 
 st.set_page_config(page_title="Official Friend Portal", layout="centered")
 
@@ -12,7 +13,10 @@ users = {
     "PRIVATE": "HIDDEN"
 }
 
-# 2. Setup Session State
+# 2. Setup Directories & Session State
+if not os.path.exists("uploads"):
+    os.makedirs("uploads")
+
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "current_user" not in st.session_state:
@@ -21,10 +25,11 @@ if "current_user" not in st.session_state:
 # 3. Global Chat Functions
 CHAT_FILE = "chat_log.txt"
 
-def save_message(user, text):
+def save_message(user, text, msg_type="text"):
     timestamp = datetime.now().strftime("%H:%M")
     with open(CHAT_FILE, "a") as f:
-        f.write(f"[{timestamp}] {user}: {text}\n")
+        # We use a | separator to tell the difference between text and images
+        f.write(f"{timestamp}|{user}|{msg_type}|{text}\n")
 
 def get_messages():
     if os.path.exists(CHAT_FILE):
@@ -48,48 +53,54 @@ if not st.session_state.authenticated:
 
 # 5. The Main Portal (After Login)
 else:
-    # AUTO-REFRESH: Keeps the chat live every 5 seconds
     st_autorefresh(interval=5000, key="chatupdate")
-
     st.title(f"Welcome, Agent {st.session_state.current_user}")
     
     # SOS SECTION
     if st.button("🚨 TRIGGER SOS 🚨"):
-        save_message("SYSTEM", f"🚨 SOS TRIGGERED BY {st.session_state.current_user} 🚨")
+        save_message("SYSTEM", f"SOS TRIGGERED BY {st.session_state.current_user}", "text")
         st.error("EMERGENCY SIGNAL SENT!")
 
     st.divider()
 
-    # GLOBAL CHAT SECTION
+    # GLOBAL CHAT DISPLAY
     st.subheader("💬 Global Mission Chat")
     
-    # NEW: Auto-Scrolling HTML Chat Box
     chat_data = get_messages()
-    chat_html = ""
-    for msg in chat_data:
-        chat_html += f"<p style='margin:5px; font-family:monospace;'>{msg.strip()}</p>"
+    
+    # Create a scrollable container for messages
+    with st.container():
+        for line in chat_data:
+            try:
+                time, user, mtype, content = line.strip().split("|")
+                if mtype == "text":
+                    st.markdown(f"**[{time}] {user}:** {content}")
+                elif mtype == "image":
+                    st.markdown(f"**[{time}] {user} sent a photo:**")
+                    st.image(content, width=250)
+            except:
+                continue
 
-    # This CSS creates the scrolling window and forces it to the bottom
-    st.markdown(
-        f"""
-        <div id="chat-container" style="height:300px; overflow-y:auto; border:1px solid #444; padding:10px; border-radius:5px; background-color:#111; color:#0f0;">
-            {chat_html}
-            <div id="end"></div>
-        </div>
-        <script>
-            var element = document.getElementById("chat-container");
-            element.scrollTop = element.scrollHeight;
-        </script>
-        """,
-        unsafe_allow_html=True
-    )
+    st.divider()
 
-    # Message Input
+    # MESSAGE & IMAGE INPUT
+    # Text Input
     with st.form("chat_form", clear_on_submit=True):
         text = st.text_input("Type mission report...")
-        submitted = st.form_submit_button("Send to Team")
+        submitted = st.form_submit_button("Send Text")
         if submitted and text:
-            save_message(st.session_state.current_user, text)
+            save_message(st.session_state.current_user, text, "text")
+            st.rerun()
+
+    # Image Upload
+    img_file = st.file_uploader("Upload Intel (Image)", type=['png', 'jpg', 'jpeg'])
+    if img_file is not None:
+        if st.button("Deploy Image"):
+            file_path = os.path.join("uploads", img_file.name)
+            with open(file_path, "wb") as f:
+                f.write(img_file.getbuffer())
+            save_message(st.session_state.current_user, file_path, "image")
+            st.success("Image Sent!")
             st.rerun()
 
     if st.button("Log Out"):
