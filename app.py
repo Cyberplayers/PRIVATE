@@ -7,27 +7,17 @@ import time as t
 # 1. Page Config & Security Shield
 st.set_page_config(page_title="Official Friend Portal", layout="centered")
 
-# CSS to block right-clicks and text selection for security
+# CSS for Security: Blocks right-click and selection
 st.markdown("""
     <style>
-    * {
-        -webkit-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
-        user-select: none;
-    }
-    img {
-        pointer-events: none;
-        -webkit-touch-callout: none;
-    }
-    .stApp {
-        background-color: #0e1117;
-        color: #00ff41;
-    }
+    * { -webkit-user-select: none; user-select: none; }
+    img { pointer-events: none; }
+    .stApp { background-color: #0e1117; color: #00ff41; }
+    .security-msg { color: #ffffff; font-weight: bold; border: 2px solid #ff4b4b; padding: 10px; border-radius: 5px; background: #ff4b4b; text-align: center; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Database Setup
+# 2. Database & User Setup
 users = {"PANTHER": "SOURCER", "SCORPION": "MASTERMIND", "PRIVATE": "HIDDEN"}
 if not os.path.exists("uploads"):
     os.makedirs("uploads")
@@ -35,7 +25,7 @@ if not os.path.exists("uploads"):
 CHAT_FILE = "chat_log.txt"
 STATUS_FILE = "user_activity.txt"
 
-# 3. Functions
+# 3. Helper Functions
 def save_message(user, content, msg_type="text"):
     timestamp = datetime.now().strftime("%H:%M")
     unix_time = t.time()
@@ -57,7 +47,28 @@ def get_last_seen():
                 except: continue
     return seen_dict
 
-# 4. Login Logic
+# 4. Screenshot Detection JavaScript
+# Triggers if the user switches apps or takes a screenshot (loses focus)
+st.components.v1.html(f"""
+    <script>
+    document.addEventListener("visibilitychange", function() {{
+        if (document.visibilityState === 'hidden') {{
+            fetch("/?ss_event=true&user={st.session_state.get('current_user', 'UNKNOWN')}");
+        }}
+    }});
+    </script>
+""", height=0)
+
+# Check for Screenshot/Recording Trigger
+query = st.query_params
+if query.get("ss_event") == "true":
+    violator = query.get("user", "UNKNOWN")
+    # PANTHER is the only one who doesn't trigger the alert
+    if violator != "PANTHER" and violator != "UNKNOWN":
+        save_message("SYSTEM", f"🚨 ALERT: {violator} took a screenshot or recorded the chat!", "security")
+    st.query_params.clear()
+
+# 5. Auth Logic
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
@@ -72,7 +83,7 @@ if not st.session_state.authenticated:
         else:
             st.error("Invalid Credentials")
 else:
-    # 5. ONLINE STATUS & REFRESH
+    # 6. REFRESH & STATUS
     st_autorefresh(interval=5000, key="chatupdate")
     update_activity(st.session_state.current_user)
     last_seen = get_last_seen()
@@ -81,7 +92,7 @@ else:
     st.markdown(f"**Agents Active:** {', '.join(online_agents)}")
     st.title(f"Welcome, Agent {st.session_state.current_user}")
     
-    # 6. CHAT DISPLAY
+    # 7. CHAT DISPLAY
     chat_box = st.container(height=450)
     with chat_box:
         if os.path.exists(CHAT_FILE):
@@ -93,7 +104,11 @@ else:
                         for u, ts in last_seen.items():
                             if u != sender and ts > float(unix): status = "✓✓"
                         
-                        if mtype == "text": 
+                        # Only PANTHER sees these security alerts
+                        if mtype == "security":
+                            if st.session_state.current_user == "PANTHER":
+                                st.markdown(f"<div class='security-msg'>[{clock}] {content}</div>", unsafe_allow_html=True)
+                        elif mtype == "text": 
                             st.write(f"**[{clock}] {sender}:** {content} `{status}`")
                         elif mtype == "image": 
                             st.write(f"**[{clock}] {sender} sent intel:**")
@@ -105,7 +120,7 @@ else:
 
     st.divider()
 
-    # 7. INPUT TABS
+    # 8. THE FOUR OPTIONS
     t1, t2, t3, t4 = st.tabs(["💬 Text", "📸 Camera", "📁 Media", "🎤 Voice"])
     
     with t1:
@@ -126,7 +141,7 @@ else:
                 st.rerun()
 
     with t3:
-        media_file = st.file_uploader("Select from Gallery", type=['png','jpg','jpeg'], key="media_input")
+        media_file = st.file_uploader("Select Media", type=['png','jpg','jpeg','mp4'], key="media_input")
         if media_file and st.button("Upload Selected"):
             mp = os.path.join("uploads", media_file.name)
             with open(mp, "wb") as f: f.write(media_file.getbuffer())
@@ -134,7 +149,7 @@ else:
             st.rerun()
 
     with t4:
-        audio_data = st.audio_input("Tap to record", key="voice_input")
+        audio_data = st.audio_input("Record Voice", key="voice_input")
         if audio_data:
             audio_id = hash(audio_data.getvalue())
             if "last_voice_id" not in st.session_state or st.session_state.last_voice_id != audio_id:
