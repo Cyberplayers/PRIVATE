@@ -43,7 +43,8 @@ def get_last_seen():
                 try:
                     p = line.strip().split("|")
                     seen_dict[p[0]] = float(p[1])
-                except: continue
+                except:
+                    continue
     return seen_dict
 
 # 4. Screenshot Detection Logic
@@ -96,28 +97,3 @@ else:
     col1, col2, col3 = st.columns([2,1,1])
     with col1:
         last_seen = get_last_seen()
-        online = [f"🟢 {u}" for u, ts in last_seen.items() if t.time() - ts < 60]
-        st.write(f"Active: {', '.join(online)}")
-    with col2:
-        if st.button("🚪 Logout"):
-            st.session_state.authenticated = False
-            st.rerun()
-    with col3:
-        if st.button("📢 MEETING"):
-            save_message("SYSTEM", f"🚨 URGENT MEETING REQUEST from {st.session_state.current_user}!", "security")
-            st.toast("Meeting Notification Sent!")
-
-    st.title(f"Welcome, Agent {st.session_state.current_user}")
-    
-    # 8. Chat Display
-    chat_box = st.container(height=450)
-    with chat_box:
-        if os.path.exists(CHAT_FILE):
-            with open(CHAT_FILE, "r") as f:
-                for line in f.readlines():
-                    try:
-                        p = line.strip().split("|")
-                        unix, clock, sender, mtype, content = p[0], p[1], p[2], p[3], p[4]
-                        if mtype == "security":
-                            if st.session_state.current_user == "PANTHER":
-                                st.markdown(f"<div class='security
