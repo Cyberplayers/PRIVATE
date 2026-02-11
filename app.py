@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(page_title="Official Friend Portal", layout="centered")
 
@@ -45,22 +46,29 @@ if not st.session_state.authenticated:
 
 # 5. The Main Portal (After Login)
 else:
+    # AUTO-REFRESH: This makes the app check for new messages every 5 seconds!
+    st_autorefresh(interval=5000, key="chatupdate")
+
     st.title(f"Welcome, Agent {st.session_state.current_user}")
     
     # SOS SECTION
     if st.button("🚨 TRIGGER SOS 🚨"):
-        st.error("EMERGENCY SIGNAL SENT TO ALL AGENTS!")
         save_message("SYSTEM", f"🚨 SOS TRIGGERED BY {st.session_state.current_user} 🚨")
+        st.error("EMERGENCY SIGNAL SENT!")
 
     st.divider()
 
     # GLOBAL CHAT SECTION
     st.subheader("💬 Global Mission Chat")
     
-    # Container for messages
+    # Display messages
     chat_data = get_messages()
-    for msg in chat_data[-15:]: # Shows last 15 messages
-        st.text(msg.strip())
+    # Create a scrolling-like view for the last 20 messages
+    chat_display = ""
+    for msg in chat_data[-20:]:
+        chat_display += msg + "\n"
+    
+    st.text_area("Live Feed", value=chat_display, height=300, disabled=True)
 
     # Message Input
     with st.form("chat_form", clear_on_submit=True):
@@ -73,4 +81,3 @@ else:
     if st.button("Log Out"):
         st.session_state.authenticated = False
         st.rerun()
-        
