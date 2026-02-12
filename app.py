@@ -32,7 +32,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Database Setup
+# 2. Database & File Setup
 users = {"PANTHER": "SOURCER", "SCORPION": "MASTERMIND", "PRIVATE": "HIDDEN"}
 if not os.path.exists("uploads"): os.makedirs("uploads")
 CHAT_FILE = "chat_log.txt"
@@ -43,13 +43,13 @@ def save_message(user, content, msg_type="text"):
     with open(CHAT_FILE, "a") as f:
         f.write(f"{uid}|{ts}|{user}|{msg_type}|{content}\n")
 
-# 3. Auth Initialization (Prevents "Blackout" AttributeError)
+# 3. Session State Initialization
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "last_seen_id" not in st.session_state:
     st.session_state.last_seen_id = None
 
-# 4. Login Screen
+# 4. Login Logic
 if not st.session_state.authenticated:
     st.title("🔐 Login")
     u_in = st.text_input("User").upper()
@@ -60,7 +60,7 @@ if not st.session_state.authenticated:
             st.session_state.current_user = u_in
             st.rerun()
 else:
-    # 5. THE HEARTBEAT (Keeps site awake while tab is open)
+    # 5. Heartbeat & Auto-Refresh (Keeps site awake while tab is open)
     st_autorefresh(interval=3000, key="portal_heartbeat") 
 
     if os.path.exists(CHAT_FILE):
@@ -70,6 +70,7 @@ else:
                 last_data = lines[-1].strip().split("|")
                 current_last_id = last_data[0]
                 
+                # Notification trigger
                 if current_last_id != st.session_state.last_seen_id:
                     if last_data[2] != st.session_state.current_user:
                         trigger_js_features(last_data[2], last_data[4])
@@ -78,7 +79,7 @@ else:
                 # Auto-Scroll
                 st.components.v1.html("<script>window.parent.document.querySelector('div[data-testid=\"stVerticalBlockBorderWrapper\"]').scrollTop = 1000000;</script>", height=0)
 
-    # 6. Portal UI
+    # 6. Chat Display
     st.title(f"Portal: {st.session_state.current_user}")
     
     chat_box = st.container(height=450, border=True)
@@ -91,17 +92,20 @@ else:
                         st.write(f"**[{ts}] {user}:** {msg}")
                     except: continue
 
-    # 7. Tools
+    # 7. Input Form
     with st.form("msg_form", clear_on_submit=True):
         txt = st.text_input("Message")
         if st.form_submit_button("Send"):
-            save_message(st.session_state.current_user, txt, "text")
-            st.rerun()
+            if txt.strip():
+                save_message(st.session_state.current_user, txt, "text")
+                st.rerun()
 
-    # 8. Fixed Self-Destruct (Indentation Fix for Line 108)
+    # 8. Self-Destruct Feature (Fixed Indentation)
     if st.session_state.current_user == "PANTHER":
         st.write("---")
         if st.button("🧨 SELF-DESTRUCT CHAT"):
             if os.path.exists(CHAT_FILE):
                 os.remove(CHAT_FILE)
-            st.rerun()
+                st.success("History Purged.")
+                t.sleep(1)
+                st.rerun()
