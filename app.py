@@ -60,8 +60,7 @@ if not st.session_state.authenticated:
             st.session_state.current_user = u_in
             st.rerun()
 else:
-    # 5. THE KEEP-ALIVE ENGINE
-    # This pings the server every 3s. If you leave this tab open, it NEVER sleeps.
+    # 5. THE HEARTBEAT (Keeps site awake while tab is open)
     st_autorefresh(interval=3000, key="portal_heartbeat") 
 
     if os.path.exists(CHAT_FILE):
@@ -99,7 +98,7 @@ else:
             save_message(st.session_state.current_user, txt, "text")
             st.rerun()
 
-    # 8. Fixed Self Destruct
+    # 8. Fixed Self-Destruct (Indentation Fix for Line 108)
     if st.session_state.current_user == "PANTHER":
         st.write("---")
         if st.button("🧨 SELF-DESTRUCT CHAT"):
