@@ -4,7 +4,7 @@ from streamlit_autorefresh import st_autorefresh
 from datetime import datetime
 import time as t
 
-# 1. Page Configuration & CSS
+# 1. Page Configuration
 st.set_page_config(page_title="Official Friend Portal", layout="centered")
 
 # JavaScript for: Notifications + Vibration + AUTO-SCROLL
@@ -17,7 +17,6 @@ def trigger_js_features(sender, message):
             vibrate: [200, 100, 200]
         }});
     }}
-    // Auto-Scroll Logic: Targets the Streamlit vertical block
     var chatWindow = window.parent.document.querySelector('.stElementContainer div[data-testid="stVerticalBlockBorderWrapper"]');
     if (chatWindow) {{
         chatWindow.scrollTop = chatWindow.scrollHeight;
@@ -61,4 +60,49 @@ if not st.session_state.authenticated:
             st.session_state.current_user = u_in
             st.rerun()
 else:
-    # 5. Refresh & Automation Engine (Pings every 3s to keep Cron-job alive
+    # 5. THE KEEP-ALIVE ENGINE
+    # This pings the server every 3s. If you leave this tab open, it NEVER sleeps.
+    st_autorefresh(interval=3000, key="portal_heartbeat") 
+
+    if os.path.exists(CHAT_FILE):
+        with open(CHAT_FILE, "r") as f:
+            lines = f.readlines()
+            if lines:
+                last_data = lines[-1].strip().split("|")
+                current_last_id = last_data[0]
+                
+                if current_last_id != st.session_state.last_seen_id:
+                    if last_data[2] != st.session_state.current_user:
+                        trigger_js_features(last_data[2], last_data[4])
+                    st.session_state.last_seen_id = current_last_id
+                
+                # Auto-Scroll
+                st.components.v1.html("<script>window.parent.document.querySelector('div[data-testid=\"stVerticalBlockBorderWrapper\"]').scrollTop = 1000000;</script>", height=0)
+
+    # 6. Portal UI
+    st.title(f"Portal: {st.session_state.current_user}")
+    
+    chat_box = st.container(height=450, border=True)
+    with chat_box:
+        if os.path.exists(CHAT_FILE):
+            with open(CHAT_FILE, "r") as f:
+                for line in f.readlines():
+                    try:
+                        _, ts, user, mtype, msg = line.strip().split("|")
+                        st.write(f"**[{ts}] {user}:** {msg}")
+                    except: continue
+
+    # 7. Tools
+    with st.form("msg_form", clear_on_submit=True):
+        txt = st.text_input("Message")
+        if st.form_submit_button("Send"):
+            save_message(st.session_state.current_user, txt, "text")
+            st.rerun()
+
+    # 8. Fixed Self Destruct
+    if st.session_state.current_user == "PANTHER":
+        st.write("---")
+        if st.button("🧨 SELF-DESTRUCT CHAT"):
+            if os.path.exists(CHAT_FILE):
+                os.remove(CHAT_FILE)
+            st.rerun()
